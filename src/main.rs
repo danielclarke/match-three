@@ -71,7 +71,7 @@ async fn main() {
         if down && !board.is_static() {
             update_rate = 0.1;
         } else {
-            update_rate = 1.0; // - level as f32 / 20.0;
+            update_rate = 1.0 - level as f32 / 20.0;
             down = false;
             if dt_input >= input_update_rate {
                 dt_input -= input_update_rate;
