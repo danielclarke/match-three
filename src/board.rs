@@ -9,23 +9,35 @@ pub struct Board {
     hidden_top_rows: i16,
     cells: Vec<i16>,
     next_gems: Option<[i16; 3]>,
-    active_gems: Option<[i16; 3]>,
+    active_cells: Option<[i16; 3]>,
     spawn_chances: [f32; 3],
     spawn_chance_changes: f32,
+    cleared_cells: u32,
+    update_rate: f32,
+    elapsed_time: f32,
+    textures: [Texture2D; 3],
 }
 
 impl Board {
-    pub fn new(width: i16, height: i16) -> Board {
+    pub async fn new(width: i16, height: i16) -> Board {
         let board = Board {
             width: width,
             height: height,
             num_cells: width * height,
             hidden_top_rows: 2,
             cells: vec![0; (width * height) as usize],
-            active_gems: None,
+            active_cells: None,
             next_gems: None,
             spawn_chances: [0.0, 0.2, 0.95],
             spawn_chance_changes: 0.9,
+            cleared_cells: 0,
+            update_rate: 1.0,
+            elapsed_time: 0.0,
+            textures: [
+                load_texture("res/red.png").await.expect("Error Loading"),
+                load_texture("res/green.png").await.expect("Error Loading"),
+                load_texture("res/blue.png").await.expect("Error Loading"),
+            ],
         };
 
         board
@@ -54,15 +66,15 @@ impl Board {
                 cells[self.xy_idx(x, y + dy)] = *cell;
             }
         }
-        match self.active_gems {
+        match self.active_cells {
             None => {}
-            Some(mut active_gems) => {
-                for i in 0..active_gems.len() {
-                    let (x, y) = self.idx_xy(active_gems[i]);
+            Some(mut active_cells) => {
+                for i in 0..active_cells.len() {
+                    let (x, y) = self.idx_xy(active_cells[i]);
                     let idx_p = self.xy_idx(x, y + 1);
-                    active_gems[i] = idx_p as i16;
+                    active_cells[i] = idx_p as i16;
                 }
-                self.active_gems = Some(active_gems);
+                self.active_cells = Some(active_cells);
             }
         }
         self.cells = cells;
@@ -144,7 +156,7 @@ impl Board {
         }
     }
 
-    fn spawn_column(&mut self, level: i16) {
+    fn spawn_column(&mut self, level: u32) {
         let r = gen_range(0.0f32, 1.0f32);
         let mut next_gems = [0; 3];
         if r > self.spawn_chances[2] * self.spawn_chance_changes.powi(level as i32) {
@@ -173,13 +185,13 @@ impl Board {
     }
 
     fn check_collision(&mut self, dx: i16) -> bool {
-        match self.active_gems {
+        match self.active_cells {
             None => {
                 return false;
             }
-            Some(active_gems) => {
-                for i in 0..active_gems.len() {
-                    let (x, y) = self.idx_xy(active_gems[i]);
+            Some(active_cells) => {
+                for i in 0..active_cells.len() {
+                    let (x, y) = self.idx_xy(active_cells[i]);
                     let idx_p = self.xy_idx(x + dx, y);
                     if self.cells[idx_p] != 0 {
                         return true;
@@ -190,38 +202,42 @@ impl Board {
         false
     }
 
-    pub fn handle_input(&mut self, left: bool, right: bool, up: bool) {
-        match self.active_gems {
-            None => {}
-            Some(mut active_gems) => {
-                let (x, _y) = self.idx_xy(active_gems[0] as i16);
-                let dx = if x > 0 && left {
-                    -1
-                } else if x < self.width - 1 && right {
-                    1
-                } else {
-                    0
-                };
-                if dx != 0 && !self.check_collision(dx) {
-                    for i in 0..active_gems.len() {
-                        let (x, y) = self.idx_xy(active_gems[i]);
-                        let idx = self.xy_idx(x, y);
-                        let idx_p = self.xy_idx(x + dx, y);
-                        self.cells[idx_p] = self.cells[idx];
-                        self.cells[idx] = 0;
-                        active_gems[i] = idx_p as i16;
+    pub fn handle_input(&mut self, left: bool, right: bool, up: bool, down: bool) {
+        if down {
+            self.update_rate = 0.05;
+        } else {
+            match self.active_cells {
+                None => {}
+                Some(mut active_cells) => {
+                    let (x, _y) = self.idx_xy(active_cells[0] as i16);
+                    let dx = if x > 0 && left {
+                        -1
+                    } else if x < self.width - 1 && right {
+                        1
+                    } else {
+                        0
+                    };
+                    if dx != 0 && !self.check_collision(dx) {
+                        for i in 0..active_cells.len() {
+                            let (x, y) = self.idx_xy(active_cells[i]);
+                            let idx = self.xy_idx(x, y);
+                            let idx_p = self.xy_idx(x + dx, y);
+                            self.cells[idx_p] = self.cells[idx];
+                            self.cells[idx] = 0;
+                            active_cells[i] = idx_p as i16;
+                        }
                     }
-                }
-                if up {
-                    let g0 = self.cells[active_gems[0] as usize];
-                    let g1 = self.cells[active_gems[1] as usize];
-                    let g2 = self.cells[active_gems[2] as usize];
+                    if up {
+                        let g0 = self.cells[active_cells[0] as usize];
+                        let g1 = self.cells[active_cells[1] as usize];
+                        let g2 = self.cells[active_cells[2] as usize];
 
-                    self.cells[active_gems[0] as usize] = g1;
-                    self.cells[active_gems[1] as usize] = g2;
-                    self.cells[active_gems[2] as usize] = g0;
+                        self.cells[active_cells[0] as usize] = g1;
+                        self.cells[active_cells[1] as usize] = g2;
+                        self.cells[active_cells[2] as usize] = g0;
+                    }
+                    self.active_cells = Some(active_cells);
                 }
-                self.active_gems = Some(active_gems);
             }
         }
     }
@@ -237,31 +253,68 @@ impl Board {
         false
     }
 
-    pub fn update(&mut self, level: i16) -> i16 {
-        let mut cleared_cells = 0;
-        if self.is_static() {
-            let matching_cells = self.next_match();
-            if matching_cells.len() > 0 {
-                cleared_cells = matching_cells.len();
-                self.clear_match(matching_cells);
-                self.active_gems = None;
-            } else {
-                if !self.check_game_over() {
-                    if let Some(gems) = self.next_gems {
-                        self.cells[2] = gems[0];
-                        self.cells[8] = gems[1];
-                        self.cells[14] = gems[2];
-                    }
-                    self.active_gems = Some([2, 8, 14]);
-                    self.spawn_column(level);
+    pub fn update(&mut self, dt: f32) {
+        self.elapsed_time += dt;
+
+        if self.elapsed_time >= self.update_rate {
+            self.elapsed_time -= self.update_rate;
+            let mut cleared_cells = 0;
+            if self.is_static() {
+                let matching_cells = self.next_match();
+                if matching_cells.len() > 0 {
+                    cleared_cells = matching_cells.len();
+                    self.clear_match(matching_cells);
+                    self.active_cells = None;
+                    self.update_rate = 1.0;
                 } else {
-                    self.active_gems = None;
+                    if !self.check_game_over() {
+                        if let Some(gems) = self.next_gems {
+                            self.cells[2] = gems[0];
+                            self.cells[8] = gems[1];
+                            self.cells[14] = gems[2];
+                        }
+                        self.active_cells = Some([2, 8, 14]);
+                        self.spawn_column(self.cleared_cells / 10);
+                        self.update_rate = 1.0;
+                    } else {
+                        self.active_cells = None;
+                    }
                 }
+            } else {
+                match self.active_cells {
+                    None => {
+                        self.update_rate = 0.05;
+                    }
+                    Some(_) => {}
+                }
+                self.drop();
             }
-        } else {
-            self.drop();
+            self.cleared_cells += cleared_cells as u32;
         }
-        cleared_cells as i16
+    }
+
+    fn render_bg(&self) {
+        let sw = screen_width();
+        let sh = screen_height();
+        let visible_height = self.height - self.hidden_top_rows;
+        let ratio = sw / sh;
+        let sq_size_x = 320.0 / ratio / visible_height as f32;
+        let sq_size_y = 320.0 / visible_height as f32;
+
+        for i in 0..(sw / sq_size_x) as i32 {
+            for j in 0..(sh / sq_size_y) as i32 {
+                draw_texture_ex(
+                    self.textures[2],
+                    i as f32 * sq_size_x,
+                    j as f32 * sq_size_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(sq_size_x, sq_size_y)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
     }
 
     pub fn render(&self) {
@@ -271,11 +324,57 @@ impl Board {
         let ratio = sw / sh;
         let sq_size_x = 320.0 / ratio / visible_height as f32;
         let sq_size_y = 320.0 / visible_height as f32;
+
+        self.render_bg();
+
         for (idx, cell) in self.cells[(self.width * self.hidden_top_rows) as usize..]
             .iter()
             .enumerate()
         {
             let (x, y) = self.idx_xy(idx as i16);
+
+            // if GEMS[*cell as usize] == RED {
+            //     draw_texture_ex(
+            //         self.textures[0],
+            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+            //         y as f32 * sq_size_y,
+            //         WHITE,
+            //         DrawTextureParams {
+            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
+            //             ..Default::default()
+            //         }
+            //     );
+            // } else if GEMS[*cell as usize] == GREEN {
+            //     draw_texture_ex(
+            //         self.textures[1],
+            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+            //         y as f32 * sq_size_y,
+            //         WHITE,
+            //         DrawTextureParams {
+            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
+            //             ..Default::default()
+            //         }
+            //     );
+            // } else if GEMS[*cell as usize] == BLUE {
+            //     draw_texture_ex(
+            //         self.textures[2],
+            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+            //         y as f32 * sq_size_y,
+            //         WHITE,
+            //         DrawTextureParams {
+            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
+            //             ..Default::default()
+            //         }
+            //     );
+            // } else {
+            //     draw_rectangle(
+            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+            //         y as f32 * sq_size_y,
+            //         sq_size_x - 0.5,
+            //         sq_size_y - 0.5,
+            //         GEMS[*cell as usize],
+            //     );
+            // }
             draw_rectangle(
                 x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
                 y as f32 * sq_size_y,
@@ -285,7 +384,7 @@ impl Board {
             );
         }
 
-        let next_gems = match [self.active_gems, self.next_gems] {
+        let next_gems = match [self.active_cells, self.next_gems] {
             [Some(gems), _] if gems[0] < self.width * self.hidden_top_rows => Some([
                 self.cells[gems[0] as usize],
                 self.cells[gems[1] as usize],
