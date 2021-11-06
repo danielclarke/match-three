@@ -10,7 +10,7 @@ use board::Board;
 async fn main() {
     let camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, 320.0, 320.0));
     let mut board = Board::new(BOARD_WIDTH, BOARD_HEIGHT).await;
-    let mut dt = 0.0;
+    // let mut dt = 0.0;
     let mut dt_input = 0.0;
 
     let input_update_rate = 0.0;
@@ -29,7 +29,7 @@ async fn main() {
     srand(macroquad::miniquad::date::now() as u64);
 
     loop {
-        dt += get_frame_time();
+        // dt += get_frame_time();
         dt_input += get_frame_time();
 
         left_press_time += get_frame_time();

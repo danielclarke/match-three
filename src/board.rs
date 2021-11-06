@@ -150,10 +150,15 @@ impl Board {
         matching_cells
     }
 
-    fn clear_match(&mut self, matching_cells: Vec<usize>) {
+    fn clear_match(&mut self, matching_cells: Vec<usize>) -> u32 {
+        let mut cleared_cells = 0;
         for idx in matching_cells {
-            self.cells[idx] = 0;
+            if self.cells[idx] != 0 {
+                self.cells[idx] = 0;
+                cleared_cells += 1;
+            }
         }
+        cleared_cells
     }
 
     fn spawn_column(&mut self, level: u32) {
@@ -262,8 +267,7 @@ impl Board {
             if self.is_static() {
                 let matching_cells = self.next_match();
                 if matching_cells.len() > 0 {
-                    cleared_cells = matching_cells.len();
-                    self.clear_match(matching_cells);
+                    cleared_cells = self.clear_match(matching_cells);
                     self.active_cells = None;
                     self.update_rate = 1.0;
                 } else {
@@ -317,6 +321,27 @@ impl Board {
         }
     }
 
+    pub fn render_score(&self) {
+        let sw = screen_width();
+        let sh = screen_height();
+        let visible_height = self.height - self.hidden_top_rows;
+        let ratio = sw / sh;
+        let sq_size_x = 320.0 / ratio / visible_height as f32;
+        let sq_size_y = 320.0 / visible_height as f32;
+
+        let x = 160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 4.0;
+        let y = 4.0 * sq_size_y;
+
+        draw_rectangle(x, y, sq_size_x * 3.0, sq_size_y, GEMS[0]);
+
+        draw_text_ex(
+            &self.cleared_cells.to_string(),
+            x,
+            y + sq_size_y,
+            TextParams::default(),
+        );
+    }
+
     pub fn render(&self) {
         let sw = screen_width();
         let sh = screen_height();
@@ -326,55 +351,13 @@ impl Board {
         let sq_size_y = 320.0 / visible_height as f32;
 
         self.render_bg();
+        self.render_score();
 
         for (idx, cell) in self.cells[(self.width * self.hidden_top_rows) as usize..]
             .iter()
             .enumerate()
         {
             let (x, y) = self.idx_xy(idx as i16);
-
-            // if GEMS[*cell as usize] == RED {
-            //     draw_texture_ex(
-            //         self.textures[0],
-            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
-            //         y as f32 * sq_size_y,
-            //         WHITE,
-            //         DrawTextureParams {
-            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
-            //             ..Default::default()
-            //         }
-            //     );
-            // } else if GEMS[*cell as usize] == GREEN {
-            //     draw_texture_ex(
-            //         self.textures[1],
-            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
-            //         y as f32 * sq_size_y,
-            //         WHITE,
-            //         DrawTextureParams {
-            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
-            //             ..Default::default()
-            //         }
-            //     );
-            // } else if GEMS[*cell as usize] == BLUE {
-            //     draw_texture_ex(
-            //         self.textures[2],
-            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
-            //         y as f32 * sq_size_y,
-            //         WHITE,
-            //         DrawTextureParams {
-            //             dest_size: Some(vec2(sq_size_x - 0.5, sq_size_y - 0.5,)),
-            //             ..Default::default()
-            //         }
-            //     );
-            // } else {
-            //     draw_rectangle(
-            //         x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
-            //         y as f32 * sq_size_y,
-            //         sq_size_x - 0.5,
-            //         sq_size_y - 0.5,
-            //         GEMS[*cell as usize],
-            //     );
-            // }
             draw_rectangle(
                 x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
                 y as f32 * sq_size_y,
