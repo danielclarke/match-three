@@ -265,25 +265,52 @@ impl Board {
             self.elapsed_time -= self.update_rate;
             let mut cleared_cells = 0;
             if self.is_static() {
-                let matching_cells = self.next_match();
-                if matching_cells.len() > 0 {
-                    cleared_cells = self.clear_match(matching_cells);
-                    self.active_cells = None;
-                    self.update_rate = 1.0;
-                } else {
-                    if !self.check_game_over() {
-                        if let Some(gems) = self.next_gems {
-                            self.cells[2] = gems[0];
-                            self.cells[8] = gems[1];
-                            self.cells[14] = gems[2];
-                        }
-                        self.active_cells = Some([2, 8, 14]);
-                        self.spawn_column(self.cleared_cells / 10);
-                        self.update_rate = 1.0;
-                    } else {
+                match self.active_cells {
+                    Some(_) => {
                         self.active_cells = None;
+                        self.update_rate = 1.0;
+                    },
+                    None => {
+                        let matching_cells = self.next_match();
+                        if matching_cells.len() > 0 {
+                            cleared_cells = self.clear_match(matching_cells);
+                            self.update_rate = 1.0;
+                        } else {
+                            if !self.check_game_over() {
+                                if let Some(gems) = self.next_gems {
+                                    self.cells[2] = gems[0];
+                                    self.cells[8] = gems[1];
+                                    self.cells[14] = gems[2];
+                                }
+                                self.active_cells = Some([2, 8, 14]);
+                                self.spawn_column(self.cleared_cells / 10);
+                                self.update_rate = 1.0;
+                            } else {
+                                self.active_cells = None;
+                            }
+                        }
                     }
                 }
+
+                // let matching_cells = self.next_match();
+                // if matching_cells.len() > 0 {
+                //     cleared_cells = self.clear_match(matching_cells);
+                //     self.active_cells = None;
+                //     self.update_rate = 1.0;
+                // } else {
+                //     if !self.check_game_over() {
+                //         if let Some(gems) = self.next_gems {
+                //             self.cells[2] = gems[0];
+                //             self.cells[8] = gems[1];
+                //             self.cells[14] = gems[2];
+                //         }
+                //         self.active_cells = Some([2, 8, 14]);
+                //         self.spawn_column(self.cleared_cells / 10);
+                //         self.update_rate = 1.0;
+                //     } else {
+                //         self.active_cells = None;
+                //     }
+                // }
             } else {
                 match self.active_cells {
                     None => {
@@ -321,14 +348,7 @@ impl Board {
         }
     }
 
-    pub fn render_score(&self) {
-        let sw = screen_width();
-        let sh = screen_height();
-        let visible_height = self.height - self.hidden_top_rows;
-        let ratio = sw / sh;
-        let sq_size_x = 320.0 / ratio / visible_height as f32;
-        let sq_size_y = 320.0 / visible_height as f32;
-
+    fn render_score(&self, sq_size_x: f32, sq_size_y: f32) {
         let x = 160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 4.0;
         let y = 4.0 * sq_size_y;
 
@@ -342,30 +362,11 @@ impl Board {
         );
     }
 
-    pub fn render(&self) {
-        let sw = screen_width();
-        let sh = screen_height();
-        let visible_height = self.height - self.hidden_top_rows;
-        let ratio = sw / sh;
-        let sq_size_x = 320.0 / ratio / visible_height as f32;
-        let sq_size_y = 320.0 / visible_height as f32;
+    fn render_next_gems(&self, sq_size_x: f32, sq_size_y: f32) {
+        let x = 160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 2.0;
+        let y = 0.0 * sq_size_y;
 
-        self.render_bg();
-        self.render_score();
-
-        for (idx, cell) in self.cells[(self.width * self.hidden_top_rows) as usize..]
-            .iter()
-            .enumerate()
-        {
-            let (x, y) = self.idx_xy(idx as i16);
-            draw_rectangle(
-                x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
-                y as f32 * sq_size_y,
-                sq_size_x - 0.5,
-                sq_size_y - 0.5,
-                GEMS[*cell as usize],
-            );
-        }
+        draw_rectangle(x - 0.25, y - 0.25, sq_size_x, sq_size_y * 3.0, GEMS[0]);
 
         let next_gems = match [self.active_cells, self.next_gems] {
             [Some(gems), _] if gems[0] < self.width * self.hidden_top_rows => Some([
@@ -387,6 +388,41 @@ impl Board {
                     GEMS[*cell as usize],
                 );
             }
+        }
+    }
+
+    pub fn render(&self) {
+        let sw = screen_width();
+        let sh = screen_height();
+        let visible_height = self.height - self.hidden_top_rows;
+        let ratio = sw / sh;
+        let sq_size_x = 320.0 / ratio / visible_height as f32;
+        let sq_size_y = 320.0 / visible_height as f32;
+
+        self.render_bg();
+        self.render_score(sq_size_x, sq_size_y);
+        self.render_next_gems(sq_size_x, sq_size_y);
+
+        draw_rectangle(
+            160.0 - self.width as f32 * sq_size_x / 2.0 - 0.25,
+            0.0,
+            sq_size_x * self.width as f32,
+            sq_size_y * self.height as f32,
+            WHITE,
+        );
+
+        for (idx, cell) in self.cells[(self.width * self.hidden_top_rows) as usize..]
+            .iter()
+            .enumerate()
+        {
+            let (x, y) = self.idx_xy(idx as i16);
+            draw_rectangle(
+                x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+                y as f32 * sq_size_y,
+                sq_size_x - 0.5,
+                sq_size_y - 0.5,
+                GEMS[*cell as usize],
+            );
         }
     }
 }
