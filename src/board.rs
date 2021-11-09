@@ -29,7 +29,7 @@ impl Board {
             active_cells: None,
             next_gems: None,
             spawn_chances: [0.0, 0.2, 0.95],
-            spawn_chance_changes: 0.9,
+            spawn_chance_changes: 0.99,
             cleared_cells: 0,
             update_rate: 1.0,
             elapsed_time: 0.0,
@@ -264,17 +264,18 @@ impl Board {
         if self.elapsed_time >= self.update_rate {
             self.elapsed_time -= self.update_rate;
             let mut cleared_cells = 0;
+            let level = self.cleared_cells / 10;
             if self.is_static() {
                 match self.active_cells {
                     Some(_) => {
                         self.active_cells = None;
-                        self.update_rate = 1.0;
+                        self.update_rate = (0.95 as f32).powi(level as i32);
                     },
                     None => {
                         let matching_cells = self.next_match();
                         if matching_cells.len() > 0 {
                             cleared_cells = self.clear_match(matching_cells);
-                            self.update_rate = 1.0;
+                            self.update_rate = (0.95 as f32).powi(level as i32);
                         } else {
                             if !self.check_game_over() {
                                 if let Some(gems) = self.next_gems {
@@ -283,34 +284,14 @@ impl Board {
                                     self.cells[14] = gems[2];
                                 }
                                 self.active_cells = Some([2, 8, 14]);
-                                self.spawn_column(self.cleared_cells / 10);
-                                self.update_rate = 1.0;
+                                self.spawn_column(level);
+                                self.update_rate = (0.95 as f32).powi(level as i32);
                             } else {
                                 self.active_cells = None;
                             }
                         }
                     }
                 }
-
-                // let matching_cells = self.next_match();
-                // if matching_cells.len() > 0 {
-                //     cleared_cells = self.clear_match(matching_cells);
-                //     self.active_cells = None;
-                //     self.update_rate = 1.0;
-                // } else {
-                //     if !self.check_game_over() {
-                //         if let Some(gems) = self.next_gems {
-                //             self.cells[2] = gems[0];
-                //             self.cells[8] = gems[1];
-                //             self.cells[14] = gems[2];
-                //         }
-                //         self.active_cells = Some([2, 8, 14]);
-                //         self.spawn_column(self.cleared_cells / 10);
-                //         self.update_rate = 1.0;
-                //     } else {
-                //         self.active_cells = None;
-                //     }
-                // }
             } else {
                 match self.active_cells {
                     None => {
