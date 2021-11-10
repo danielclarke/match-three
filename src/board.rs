@@ -34,9 +34,9 @@ impl Board {
             update_rate: 1.0,
             elapsed_time: 0.0,
             textures: [
-                load_texture("res/red.png").await.expect("Error Loading"),
-                load_texture("res/green.png").await.expect("Error Loading"),
-                load_texture("res/blue.png").await.expect("Error Loading"),
+                load_texture("res/sky.png").await.expect("Error Loading"),
+                load_texture("res/grass.png").await.expect("Error Loading"),
+                load_texture("res/orange-dirt.png").await.expect("Error Loading"),
             ],
         };
 
@@ -314,7 +314,35 @@ impl Board {
         let sq_size_y = 320.0 / visible_height as f32;
 
         for i in 0..(sw / sq_size_x) as i32 {
-            for j in 0..(sh / sq_size_y) as i32 {
+            for j in 0..3 {
+                draw_texture_ex(
+                    self.textures[0],
+                    i as f32 * sq_size_x,
+                    j as f32 * sq_size_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(sq_size_x, sq_size_y)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        for i in 0..(sw / sq_size_x) as i32 {
+            draw_texture_ex(
+                self.textures[1],
+                i as f32 * sq_size_x,
+                3.0 * sq_size_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(sq_size_x, sq_size_y)),
+                    ..Default::default()
+                },
+            );
+        }
+
+        for i in 0..(sw / sq_size_x) as i32 {
+            for j in 4..(sh / sq_size_y) as i32 {
                 draw_texture_ex(
                     self.textures[2],
                     i as f32 * sq_size_x,
