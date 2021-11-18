@@ -2,6 +2,9 @@ use macroquad::{prelude::*, rand::gen_range};
 
 const GEMS: [Color; 8] = [BLACK, RED, BLUE, GREEN, YELLOW, ORANGE, PINK, PURPLE];
 
+const CAMERA_WIDTH: f32 = 256.0;
+const CAMERA_HEIGHT: f32 = 240.0;
+
 pub struct Board {
     width: i16,
     height: i16,
@@ -10,6 +13,7 @@ pub struct Board {
     cells: Vec<i16>,
     next_gems: Option<[i16; 3]>,
     active_cells: Option<[i16; 3]>,
+    matching_cells: Option<Vec<usize>>,
     spawn_chances: [f32; 3],
     spawn_chance_changes: f32,
     cleared_cells: u32,
@@ -28,6 +32,7 @@ impl Board {
             cells: vec![0; (width * height) as usize],
             active_cells: None,
             next_gems: None,
+            matching_cells: None,
             spawn_chances: [0.0, 0.2, 0.95],
             spawn_chance_changes: 0.99,
             cleared_cells: 0,
@@ -36,7 +41,9 @@ impl Board {
             textures: [
                 load_texture("res/sky.png").await.expect("Error Loading"),
                 load_texture("res/grass.png").await.expect("Error Loading"),
-                load_texture("res/orange-dirt.png").await.expect("Error Loading"),
+                load_texture("res/orange-dirt.png")
+                    .await
+                    .expect("Error Loading"),
             ],
         };
 
@@ -266,32 +273,55 @@ impl Board {
             let mut cleared_cells = 0;
             let level = self.cleared_cells / 10;
             if self.is_static() {
-                match self.active_cells {
-                    Some(_) => {
-                        self.active_cells = None;
+                if let Some(matching_cells) = self.matching_cells.take() {
+                    cleared_cells = self.clear_match(matching_cells);
+                    self.update_rate = 0.05;
+                } else {
+                    let matching_cells = self.next_match();
+                    if matching_cells.len() > 0 {
+                        self.matching_cells = Some(matching_cells);
                         self.update_rate = (0.95 as f32).powi(level as i32);
-                    },
-                    None => {
-                        let matching_cells = self.next_match();
-                        if matching_cells.len() > 0 {
-                            cleared_cells = self.clear_match(matching_cells);
+                    } else {
+                        if !self.check_game_over() {
+                            if let Some(gems) = self.next_gems {
+                                self.cells[2] = gems[0];
+                                self.cells[8] = gems[1];
+                                self.cells[14] = gems[2];
+                            }
+                            self.active_cells = Some([2, 8, 14]);
+                            self.spawn_column(level);
                             self.update_rate = (0.95 as f32).powi(level as i32);
                         } else {
-                            if !self.check_game_over() {
-                                if let Some(gems) = self.next_gems {
-                                    self.cells[2] = gems[0];
-                                    self.cells[8] = gems[1];
-                                    self.cells[14] = gems[2];
-                                }
-                                self.active_cells = Some([2, 8, 14]);
-                                self.spawn_column(level);
-                                self.update_rate = (0.95 as f32).powi(level as i32);
-                            } else {
-                                self.active_cells = None;
-                            }
+                            self.active_cells = None;
                         }
                     }
                 }
+                // match self.active_cells {
+                //     Some(_) => {
+                //         self.active_cells = None;
+                //         self.update_rate = (0.95 as f32).powi(level as i32);
+                //     }
+                //     None => {
+                //         let matching_cells = self.next_match();
+                //         if matching_cells.len() > 0 {
+                //             cleared_cells = self.clear_match(matching_cells);
+                //             self.update_rate = (0.95 as f32).powi(level as i32);
+                //         } else {
+                //             if !self.check_game_over() {
+                //                 if let Some(gems) = self.next_gems {
+                //                     self.cells[2] = gems[0];
+                //                     self.cells[8] = gems[1];
+                //                     self.cells[14] = gems[2];
+                //                 }
+                //                 self.active_cells = Some([2, 8, 14]);
+                //                 self.spawn_column(level);
+                //                 self.update_rate = (0.95 as f32).powi(level as i32);
+                //             } else {
+                //                 self.active_cells = None;
+                //             }
+                //         }
+                //     }
+                // }
             } else {
                 match self.active_cells {
                     None => {
@@ -310,8 +340,8 @@ impl Board {
         let sh = screen_height();
         let visible_height = self.height - self.hidden_top_rows;
         let ratio = sw / sh;
-        let sq_size_x = 320.0 / ratio / visible_height as f32;
-        let sq_size_y = 320.0 / visible_height as f32;
+        let sq_size_x = CAMERA_WIDTH / ratio / visible_height as f32;
+        let sq_size_y = CAMERA_HEIGHT / visible_height as f32;
 
         for i in 0..(sw / sq_size_x) as i32 {
             for j in 0..3 {
@@ -358,7 +388,7 @@ impl Board {
     }
 
     fn render_score(&self, sq_size_x: f32, sq_size_y: f32) {
-        let x = 160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 4.0;
+        let x = CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 4.0;
         let y = 4.0 * sq_size_y;
 
         draw_rectangle(x, y, sq_size_x * 3.0, sq_size_y, GEMS[0]);
@@ -372,7 +402,7 @@ impl Board {
     }
 
     fn render_next_gems(&self, sq_size_x: f32, sq_size_y: f32) {
-        let x = 160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 2.0;
+        let x = CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 2.0;
         let y = 0.0 * sq_size_y;
 
         draw_rectangle(x - 0.25, y - 0.25, sq_size_x, sq_size_y * 3.0, GEMS[0]);
@@ -390,7 +420,7 @@ impl Board {
         if let Some(next_gems) = next_gems {
             for (idx, cell) in next_gems.iter().enumerate() {
                 draw_rectangle(
-                    160.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 2.0,
+                    CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 2.0,
                     idx as f32 * sq_size_y,
                     sq_size_x - 0.5,
                     sq_size_y - 0.5,
@@ -405,15 +435,15 @@ impl Board {
         let sh = screen_height();
         let visible_height = self.height - self.hidden_top_rows;
         let ratio = sw / sh;
-        let sq_size_x = 320.0 / ratio / visible_height as f32;
-        let sq_size_y = 320.0 / visible_height as f32;
+        let sq_size_x = CAMERA_WIDTH / ratio / visible_height as f32;
+        let sq_size_y = CAMERA_HEIGHT / visible_height as f32;
 
         self.render_bg();
         self.render_score(sq_size_x, sq_size_y);
         self.render_next_gems(sq_size_x, sq_size_y);
 
         draw_rectangle(
-            160.0 - self.width as f32 * sq_size_x / 2.0 - 0.25,
+            CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0 - 0.25,
             0.0,
             sq_size_x * self.width as f32,
             sq_size_y * self.height as f32,
@@ -426,7 +456,7 @@ impl Board {
         {
             let (x, y) = self.idx_xy(idx as i16);
             draw_rectangle(
-                x as f32 * sq_size_x + 160.0 - self.width as f32 * sq_size_x / 2.0,
+                x as f32 * sq_size_x + CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0,
                 y as f32 * sq_size_y,
                 sq_size_x - 0.5,
                 sq_size_y - 0.5,

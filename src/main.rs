@@ -3,12 +3,15 @@ use macroquad::{prelude::*, rand::srand};
 const BOARD_WIDTH: i16 = 6;
 const BOARD_HEIGHT: i16 = 16;
 
+const CAMERA_WIDTH: f32 = 256.0;
+const CAMERA_HEIGHT: f32 = 240.0;
+
 mod board;
 use board::Board;
 
 #[macroquad::main("Columns")]
 async fn main() {
-    let camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, 320.0, 320.0));
+    let camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, CAMERA_WIDTH, CAMERA_HEIGHT));
     let mut board = Board::new(BOARD_WIDTH, BOARD_HEIGHT).await;
     // let mut dt = 0.0;
     let mut dt_input = 0.0;
