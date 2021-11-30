@@ -19,7 +19,7 @@ pub struct Board {
     cleared_cells: u32,
     update_rate: f32,
     elapsed_time: f32,
-    textures: [Texture2D; 3],
+    textures: [Texture2D; 4],
 }
 
 impl Board {
@@ -42,6 +42,9 @@ impl Board {
                 load_texture("res/sky.png").await.expect("Error Loading"),
                 load_texture("res/grass.png").await.expect("Error Loading"),
                 load_texture("res/orange-dirt.png")
+                    .await
+                    .expect("Error Loading"),
+                load_texture("res/numbers.png")
                     .await
                     .expect("Error Loading"),
             ],
@@ -387,18 +390,28 @@ impl Board {
         }
     }
 
+    fn render_digit(&self, i: u8, x: f32, y: f32) {
+        draw_texture_ex(
+            self.textures[3],
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(8.0, 8.0)),
+                source: Some(Rect::new(i as f32 * 8.0, 0.0, 8.0, 8.0)),
+                ..Default::default()
+            },
+        );
+    }
+
     fn render_score(&self, sq_size_x: f32, sq_size_y: f32) {
         let x = CAMERA_WIDTH / 2.0 - self.width as f32 * sq_size_x / 2.0 - sq_size_x * 4.0;
         let y = 4.0 * sq_size_y;
 
         draw_rectangle(x, y, sq_size_x * 3.0, sq_size_y, GEMS[0]);
-
-        draw_text_ex(
-            &self.cleared_cells.to_string(),
-            x,
-            y + sq_size_y,
-            TextParams::default(),
-        );
+        for (i, c) in self.cleared_cells.to_string().chars().rev().enumerate() {
+            self.render_digit(c.to_digit(10).unwrap() as u8, x - i as f32 * 8.0 + 32.0, y);
+        }
     }
 
     fn render_next_gems(&self, sq_size_x: f32, sq_size_y: f32) {
